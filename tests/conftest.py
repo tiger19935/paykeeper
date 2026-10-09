@@ -7,7 +7,6 @@ available, integration tests are skipped — unit tests still run.
 
 from __future__ import annotations
 
-import asyncio
 import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -47,13 +46,6 @@ def _docker_available() -> bool:
     except Exception:
         return False
     return True
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Iterator[asyncio.AbstractEventLoop]:
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="session")

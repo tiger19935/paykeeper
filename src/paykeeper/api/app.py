@@ -8,10 +8,11 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from paykeeper.api.errors import install_error_handlers
-from paykeeper.api.routes import health
+from paykeeper.api.routes import charges, health
 from paykeeper.config import Settings, get_settings
 from paykeeper.db import create_engine, create_sessionmaker
 from paykeeper.logging import bind_request, clear_request, configure_logging, get_logger
+from paykeeper.providers.fake import FakeProvider
 
 log = get_logger("paykeeper.api")
 
@@ -25,6 +26,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     sm = create_sessionmaker(engine)
     app.state.engine = engine
     app.state.sessionmaker = sm
+    app.state.primary_provider = FakeProvider(
+        secret=settings.webhook_secret.get_secret_value(),
+        instance="primary",
+    )
     log.info("startup", environment=settings.environment)
     try:
         yield
@@ -67,4 +72,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     app.include_router(health.router)
+    app.include_router(charges.router)
     return app
