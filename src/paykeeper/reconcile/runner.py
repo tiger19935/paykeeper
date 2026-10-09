@@ -69,8 +69,7 @@ async def reconcile_charges(
         local = local_by_op.get(op)
         if local is None:
             remote_descr = (
-                f"{remote.get('amount')} {remote.get('currency')} "
-                f"({remote.get('provider_ref')})"
+                f"{remote.get('amount')} {remote.get('currency')} ({remote.get('provider_ref')})"
             )
             mismatches.append(
                 Mismatch(

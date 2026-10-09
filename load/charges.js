@@ -29,7 +29,7 @@ export const options = {
   },
 };
 
-// Pool of pre-generated idempotency keys. VUs share this pool so replays
+// Fixed pool of idempotency keys built once at startup. VUs share this pool so replays
 // genuinely overlap across concurrent workers.
 const KEY_POOL_SIZE = 2000;
 const keyPool = new SharedArray('keys', function () {

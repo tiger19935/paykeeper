@@ -7,7 +7,7 @@ Accepted — 2026-10-09.
 ## Context
 
 The brief specifies "scope = customer_id" so two customers who happen to use
-the same client-generated key cannot collide. The question is whether the
+the same client-supplied key cannot collide. The question is whether the
 *same* customer sending the same key to two different endpoints should also
 collide.
 
