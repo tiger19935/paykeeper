@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: paykeeper
       POSTGRES_DB: paykeeper
     ports:
-      - "5432:5432"
+      - "55432:5432"
     volumes:
       - ./load:/load:ro
     healthcheck:
@@ -38,7 +38,7 @@ services:
       PAYKEEPER_WEBHOOK_SECRET: dev-secret-change-me
       PAYKEEPER_LOG_FORMAT: json
     ports:
-      - "8000:8000"
+      - "58000:8000"
     depends_on:
       postgres:
         condition: service_healthy

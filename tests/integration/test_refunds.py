@@ -93,7 +93,7 @@ async def test_refund_replay(client: httpx.AsyncClient) -> None:
         "/v1/refunds", json=body, headers={"Idempotency-Key": "k-ref-replay"}
     )
     assert first.status_code == 201
-    assert second.status_code == 201
+    assert second.status_code == 200
     assert first.json() == second.json()
 
 

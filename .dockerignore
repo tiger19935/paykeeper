@@ -9,6 +9,7 @@ docs
 load
 tests
 *.md
+!README.md
 .pytest_cache
 .ruff_cache
 .mypy_cache

@@ -120,7 +120,10 @@ async def process_charge(
     if outcome.kind is IdempotencyOutcomeKind.REPLAY:
         assert outcome.response_body is not None
         assert outcome.response_status is not None
-        return outcome.response_status, outcome.response_body
+        # Spec: fresh creation is 201, a replay of a successful creation is 200.
+        # Other stored statuses (e.g. 402 for a card decline) stay as recorded.
+        status = 200 if outcome.response_status == 201 else outcome.response_status
+        return status, outcome.response_body
     if outcome.kind is IdempotencyOutcomeKind.STALE:
         # The recovery path is implemented in paykeeper.idempotency.recovery.
         from paykeeper.idempotency.recovery import recover_charge  # local import to avoid cycle
@@ -285,7 +288,10 @@ async def process_refund(
     if outcome.kind is IdempotencyOutcomeKind.REPLAY:
         assert outcome.response_body is not None
         assert outcome.response_status is not None
-        return outcome.response_status, outcome.response_body
+        # Spec: fresh creation is 201, a replay of a successful creation is 200.
+        # Other stored statuses (e.g. 402 for a card decline) stay as recorded.
+        status = 200 if outcome.response_status == 201 else outcome.response_status
+        return status, outcome.response_body
 
     try:
         charge_uuid = uuid.UUID(body["charge_id"])

@@ -87,7 +87,7 @@ async def test_replay_returns_identical_response(client: httpx.AsyncClient) -> N
     first = await client.post("/v1/charges", json=_BODY, headers={"Idempotency-Key": "k-replay"})
     assert first.status_code == 201
     second = await client.post("/v1/charges", json=_BODY, headers={"Idempotency-Key": "k-replay"})
-    assert second.status_code == 201
+    assert second.status_code == 200
     assert second.json() == first.json()
 
 
@@ -126,8 +126,10 @@ async def test_fifty_concurrent_identical_requests(
 
     responses = await asyncio.gather(*(one() for _ in range(50)))
 
-    for r in responses:
-        assert r.status_code == 201, r.text
+    # Exactly one request got 201 (the creator); the others replayed as 200.
+    status_counts = {s: sum(1 for r in responses if r.status_code == s) for s in {201, 200}}
+    assert status_counts[201] == 1
+    assert status_counts[200] == 49
 
     ids = {r.json()["id"] for r in responses}
     assert len(ids) == 1
