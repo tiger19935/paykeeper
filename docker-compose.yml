@@ -1,0 +1,51 @@
+name: paykeeper
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: paykeeper
+      POSTGRES_PASSWORD: paykeeper
+      POSTGRES_DB: paykeeper
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "paykeeper"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  migrator:
+    build:
+      context: .
+      target: runtime
+    environment:
+      PAYKEEPER_DATABASE_URL: postgresql+asyncpg://paykeeper:paykeeper@postgres:5432/paykeeper
+      PAYKEEPER_WEBHOOK_SECRET: dev-secret-change-me
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+
+  app:
+    build:
+      context: .
+      target: runtime
+    environment:
+      PAYKEEPER_DATABASE_URL: postgresql+asyncpg://paykeeper:paykeeper@postgres:5432/paykeeper
+      PAYKEEPER_WEBHOOK_SECRET: dev-secret-change-me
+      PAYKEEPER_LOG_FORMAT: json
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "python -c 'import urllib.request, sys; urllib.request.urlopen(\"http://localhost:8000/readyz\", timeout=2); sys.exit(0)' || exit 1"
+      interval: 5s
+      timeout: 3s
+      retries: 10
