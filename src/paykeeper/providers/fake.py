@@ -45,8 +45,6 @@ class FakeProviderBehavior:
 
 
 class FakeProvider:
-    name = "fake"
-
     def __init__(
         self,
         *,
@@ -54,6 +52,9 @@ class FakeProvider:
         behavior: FakeProviderBehavior | None = None,
         instance: str = "primary",
     ) -> None:
+        # Instance-level name so a primary and secondary fake in the same
+        # ProviderRouter don't collide on the by-name lookup.
+        self.name = f"fake:{instance}"
         self._secret = secret
         self.behavior = behavior or FakeProviderBehavior()
         self._charges: dict[str, ChargeResult] = {}

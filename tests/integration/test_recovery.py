@@ -9,7 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from paykeeper.api.errors import ProviderUnavailableError
 from paykeeper.domain.models import Charge, IdempotencyKey, LedgerEntry
 from paykeeper.domain.service import process_charge
+from paykeeper.providers.circuit import CircuitBreaker
 from paykeeper.providers.fake import FakeProvider
+from paykeeper.providers.router import ProviderRouter
+
+
+def _router(primary: FakeProvider, secondary: FakeProvider | None = None) -> ProviderRouter:
+    return ProviderRouter(
+        primary=primary,
+        secondary=secondary,
+        breaker=CircuitBreaker(failure_threshold=5, window_seconds=60, open_seconds=30),
+        retry_max_attempts=1,
+    )
+
 
 pytestmark = pytest.mark.integration
 
@@ -32,6 +44,7 @@ async def test_ambiguous_outcome_recovers_to_single_charge(
     No double charge."""
 
     provider = FakeProvider(instance="primary")
+    router = _router(provider)
     key = "k-amb-1"
 
     # First try: provider raises ProviderTimeoutError but has stored the charge.
@@ -39,7 +52,7 @@ async def test_ambiguous_outcome_recovers_to_single_charge(
         with pytest.raises(ProviderUnavailableError):
             await process_charge(
                 session,
-                provider,
+                router,
                 idempotency_key=key,
                 body=_BODY,
                 stale_after=timedelta(seconds=30),
@@ -58,7 +71,7 @@ async def test_ambiguous_outcome_recovers_to_single_charge(
     async with sessionmaker_() as session:
         status, body = await process_charge(
             session,
-            provider,
+            router,
             idempotency_key=key,
             body=_BODY,
             stale_after=timedelta(seconds=30),
@@ -86,6 +99,7 @@ async def test_stale_lock_with_no_provider_record_falls_through_to_fresh_charge(
     fresh charge."""
 
     provider = FakeProvider(instance="primary")
+    router = _router(provider)
     key = "k-amb-fresh"
 
     # Insert a stale in_progress key by hand (no corresponding provider state).
@@ -109,7 +123,7 @@ async def test_stale_lock_with_no_provider_record_falls_through_to_fresh_charge(
     async with sessionmaker_() as session:
         status, body = await process_charge(
             session,
-            provider,
+            router,
             idempotency_key=key,
             body=good_body,
             stale_after=timedelta(seconds=30),

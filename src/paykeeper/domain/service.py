@@ -36,15 +36,12 @@ from paykeeper.domain.enums import (
 from paykeeper.domain.models import Charge, LedgerEntry, OutboxEvent, Refund
 from paykeeper.idempotency import claim_or_replay, complete_key, fingerprint
 from paykeeper.idempotency.keys import IdempotencyOutcome, IdempotencyOutcomeKind
-from paykeeper.providers.backoff import with_retries
 from paykeeper.providers.base import (
     CardDeclinedError,
-    ChargeResult,
     InvalidRequestError,
-    Provider,
     ProviderError,
-    RefundResult,
 )
+from paykeeper.providers.router import ProviderRouter
 
 _IN_FLIGHT_POLL_INTERVAL_MS = 25
 _IN_FLIGHT_POLL_ATTEMPTS = 60
@@ -97,15 +94,12 @@ def _charge_to_dict(charge: Charge) -> dict[str, Any]:
 
 async def process_charge(
     session: AsyncSession,
-    provider: Provider,
+    router: ProviderRouter,
     *,
     idempotency_key: str,
     body: dict[str, Any],
     stale_after: timedelta,
     ttl: timedelta,
-    retry_max_attempts: int = 4,
-    retry_base_delay_ms: int = 50,
-    retry_max_delay_ms: int = 2000,
 ) -> tuple[int, dict[str, Any]]:
     scope = f"{IdempotencyScope.CHARGE.value}:{body['customer_id']}"
     fp = fingerprint(body)
@@ -133,7 +127,7 @@ async def process_charge(
 
         return await recover_charge(
             session,
-            provider,
+            router,
             key=idempotency_key,
             scope=scope,
             operation_id=outcome.operation_id,
@@ -142,21 +136,13 @@ async def process_charge(
 
     assert outcome.kind is IdempotencyOutcomeKind.NEW
 
-    async def _call_provider() -> ChargeResult:
-        return await provider.charge(
+    try:
+        charge_result, used_provider = await router.charge(
             amount=body["amount"],
             currency=body["currency"],
             payment_method_token=body["payment_method_token"],
             customer_id=body["customer_id"],
             operation_id=outcome.operation_id,
-        )
-
-    try:
-        charge_result = await with_retries(
-            _call_provider,
-            max_attempts=retry_max_attempts,
-            base_delay_ms=retry_base_delay_ms,
-            max_delay_ms=retry_max_delay_ms,
         )
     except CardDeclinedError as exc:
         charge = Charge(
@@ -167,7 +153,7 @@ async def process_charge(
             payment_method_token=body["payment_method_token"],
             description=body.get("description"),
             state=ChargeState.FAILED.value,
-            provider=provider.name,
+            provider=router.primary.name,
             provider_ref=None,
             operation_id=outcome.operation_id,
             failure_reason=str(exc) or "card_declined",
@@ -216,7 +202,7 @@ async def process_charge(
         payment_method_token=body["payment_method_token"],
         description=body.get("description"),
         state=ChargeState.SUCCEEDED.value,
-        provider=provider.name,
+        provider=used_provider,
         provider_ref=charge_result.provider_ref,
         operation_id=outcome.operation_id,
     )
@@ -271,15 +257,12 @@ def _refund_to_dict(refund: Refund) -> dict[str, Any]:
 
 async def process_refund(
     session: AsyncSession,
-    provider: Provider,
+    router: ProviderRouter,
     *,
     idempotency_key: str,
     body: dict[str, Any],
     stale_after: timedelta,
     ttl: timedelta,
-    retry_max_attempts: int = 4,
-    retry_base_delay_ms: int = 50,
-    retry_max_delay_ms: int = 2000,
 ) -> tuple[int, dict[str, Any]]:
     from sqlalchemy import func, select, text
 
@@ -319,7 +302,7 @@ async def process_refund(
 
         return await recover_refund(
             session,
-            provider,
+            router,
             key=idempotency_key,
             scope=scope,
             operation_id=outcome.operation_id,
@@ -360,20 +343,13 @@ async def process_refund(
             f"refund amount {body['amount']} exceeds remaining {remaining}"
         )
 
-    async def _call_provider() -> RefundResult:
-        return await provider.refund(
+    try:
+        refund_result = await router.refund(
+            on_provider=charge.provider,
             charge_provider_ref=charge.provider_ref or "",
             amount=body["amount"],
             currency=charge.currency,
             operation_id=outcome.operation_id,
-        )
-
-    try:
-        refund_result = await with_retries(
-            _call_provider,
-            max_attempts=retry_max_attempts,
-            base_delay_ms=retry_base_delay_ms,
-            max_delay_ms=retry_max_delay_ms,
         )
     except InvalidRequestError as exc:
         await session.rollback()
@@ -396,7 +372,7 @@ async def process_refund(
         currency=charge.currency,
         reason=body.get("reason"),
         state=RefundState.SUCCEEDED.value,
-        provider=provider.name,
+        provider=charge.provider,
         provider_ref=refund_result.provider_ref,
         operation_id=outcome.operation_id,
     )

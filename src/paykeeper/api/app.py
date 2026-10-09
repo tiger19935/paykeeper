@@ -12,7 +12,9 @@ from paykeeper.api.routes import charges, health, refunds, webhooks
 from paykeeper.config import Settings, get_settings
 from paykeeper.db import create_engine, create_sessionmaker
 from paykeeper.logging import bind_request, clear_request, configure_logging, get_logger
+from paykeeper.providers.circuit import CircuitBreaker
 from paykeeper.providers.fake import FakeProvider
+from paykeeper.providers.router import ProviderRouter
 
 log = get_logger("paykeeper.api")
 
@@ -26,9 +28,22 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     sm = create_sessionmaker(engine)
     app.state.engine = engine
     app.state.sessionmaker = sm
-    app.state.primary_provider = FakeProvider(
-        secret=settings.webhook_secret.get_secret_value(),
-        instance="primary",
+
+    secret = settings.webhook_secret.get_secret_value()
+    primary = FakeProvider(secret=secret, instance="primary")
+    secondary = FakeProvider(secret=secret, instance="secondary")
+    app.state.primary_provider = primary
+    app.state.provider_router = ProviderRouter(
+        primary=primary,
+        secondary=secondary,
+        breaker=CircuitBreaker(
+            failure_threshold=settings.breaker_failure_threshold,
+            window_seconds=settings.breaker_window_seconds,
+            open_seconds=settings.breaker_open_seconds,
+        ),
+        retry_max_attempts=settings.retry_max_attempts,
+        retry_base_delay_ms=settings.retry_base_delay_ms,
+        retry_max_delay_ms=settings.retry_max_delay_ms,
     )
     log.info("startup", environment=settings.environment)
     try:

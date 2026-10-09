@@ -21,17 +21,14 @@ async def create_charge(
     settings: SettingsDep,
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1, max_length=255),
 ) -> JSONResponse:
-    provider = request.app.state.primary_provider
+    router_ = request.app.state.provider_router
     status, response = await process_charge(
         session,
-        provider,
+        router_,
         idempotency_key=idempotency_key,
         body=body.model_dump(),
         stale_after=timedelta(seconds=settings.idempotency_lock_stale_seconds),
         ttl=timedelta(seconds=settings.idempotency_ttl_seconds),
-        retry_max_attempts=settings.retry_max_attempts,
-        retry_base_delay_ms=settings.retry_base_delay_ms,
-        retry_max_delay_ms=settings.retry_max_delay_ms,
     )
     return JSONResponse(status_code=status, content=response)
 

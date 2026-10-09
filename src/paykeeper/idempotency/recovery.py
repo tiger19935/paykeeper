@@ -39,6 +39,7 @@ from paykeeper.providers.base import (
     ProviderError,
     RefundResult,
 )
+from paykeeper.providers.router import ProviderRouter
 
 
 def _charge_response(charge: Charge) -> dict[str, Any]:
@@ -81,9 +82,25 @@ async def _refresh_lock(session: AsyncSession, key: str, scope: str) -> None:
     await session.commit()
 
 
+async def _find_prior(
+    router: ProviderRouter, operation_id: str
+) -> tuple[Provider, ChargeResult | RefundResult] | None:
+    candidates = [router.primary]
+    if router.secondary is not None and router.secondary is not router.primary:
+        candidates.append(router.secondary)
+    for provider in candidates:
+        try:
+            found = await provider.get_by_operation_id(operation_id=operation_id)
+        except ProviderError:
+            continue
+        if found is not None:
+            return provider, found
+    return None
+
+
 async def recover_charge(
     session: AsyncSession,
-    provider: Provider,
+    router: ProviderRouter,
     *,
     key: str,
     scope: str,
@@ -92,10 +109,9 @@ async def recover_charge(
 ) -> tuple[int, dict[str, Any]]:
     await _refresh_lock(session, key, scope)
 
-    try:
-        prior = await provider.get_by_operation_id(operation_id=operation_id)
-    except ProviderError as exc:
-        raise HTTPProviderUnavailable(f"recovery lookup failed: {exc}") from exc
+    discovered = await _find_prior(router, operation_id)
+    prior = discovered[1] if discovered else None
+    provider = discovered[0] if discovered else router.primary
 
     if prior is None or not isinstance(prior, ChargeResult):
         # Nothing exists at the provider — remove the stale key and
@@ -110,7 +126,7 @@ async def recover_charge(
 
         return await process_charge(
             session,
-            provider,
+            router,
             idempotency_key=key,
             body=request_body,
             stale_after=timedelta(seconds=30),
@@ -171,7 +187,7 @@ async def recover_charge(
 
 async def recover_refund(
     session: AsyncSession,
-    provider: Provider,
+    router: ProviderRouter,
     *,
     key: str,
     scope: str,
@@ -180,6 +196,7 @@ async def recover_refund(
     request_body: dict[str, Any],
 ) -> tuple[int, dict[str, Any]]:
     await _refresh_lock(session, key, scope)
+    provider = router.provider_by_name(charge.provider)
     try:
         prior = await provider.get_by_operation_id(operation_id=operation_id)
     except ProviderError as exc:
@@ -197,7 +214,7 @@ async def recover_refund(
         process_refund = _service.process_refund  # resolved at call time
         return await process_refund(
             session,
-            provider,
+            router,
             idempotency_key=key,
             body=request_body,
             stale_after=timedelta(seconds=30),

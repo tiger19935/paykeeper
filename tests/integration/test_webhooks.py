@@ -18,7 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from paykeeper.api.app import create_app
 from paykeeper.config import Settings
 from paykeeper.domain.models import Charge, WebhookEvent
+from paykeeper.providers.circuit import CircuitBreaker
 from paykeeper.providers.fake import FakeProvider
+from paykeeper.providers.router import ProviderRouter
 
 pytestmark = pytest.mark.integration
 
@@ -34,7 +36,21 @@ async def app(
     settings = Settings()  # type: ignore[call-arg]
     app = create_app(settings=settings)
     app.state.sessionmaker = sessionmaker_
-    app.state.primary_provider = FakeProvider(secret=_SECRET, instance="primary")
+    primary = FakeProvider(secret=_SECRET, instance="primary")
+    secondary = FakeProvider(secret=_SECRET, instance="secondary")
+    app.state.primary_provider = primary
+    app.state.provider_router = ProviderRouter(
+        primary=primary,
+        secondary=secondary,
+        breaker=CircuitBreaker(
+            failure_threshold=settings.breaker_failure_threshold,
+            window_seconds=settings.breaker_window_seconds,
+            open_seconds=settings.breaker_open_seconds,
+        ),
+        retry_max_attempts=settings.retry_max_attempts,
+        retry_base_delay_ms=settings.retry_base_delay_ms,
+        retry_max_delay_ms=settings.retry_max_delay_ms,
+    )
     yield app
 
 

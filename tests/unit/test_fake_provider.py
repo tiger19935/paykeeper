@@ -24,6 +24,7 @@ def test_fake_provider_satisfies_protocol() -> None:
 
 async def test_charge_success() -> None:
     p = FakeProvider()
+    assert p.name == "fake:primary"
     result = await p.charge(
         amount=100,
         currency="USD",
