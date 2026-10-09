@@ -9,6 +9,8 @@ services:
       POSTGRES_DB: paykeeper
     ports:
       - "5432:5432"
+    volumes:
+      - ./load:/load:ro
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "paykeeper"]
       interval: 2s
