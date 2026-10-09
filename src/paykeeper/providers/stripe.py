@@ -17,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -195,4 +195,4 @@ class StripeProvider:
             if code == "card_declined":
                 raise CardDeclinedError(message)
             raise InvalidRequestError(f"{code}: {message}")
-        return resp.json()  # type: ignore[no-any-return]
+        return cast("dict[str, Any]", resp.json())

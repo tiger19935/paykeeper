@@ -63,4 +63,6 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    # mypy sees required fields with no defaults and flags call-arg;
+    # pydantic-settings loads them from the environment at __init__ time.
     return Settings()  # type: ignore[call-arg]

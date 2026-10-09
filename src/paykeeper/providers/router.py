@@ -120,9 +120,12 @@ class ProviderRouter:
         customer_id: str,
         operation_id: str,
     ) -> tuple[ChargeResult, str]:
-        assert self.secondary is not None
+        # Local binding so mypy narrows inside the lambda closure, which
+        # would otherwise re-widen `self.secondary` to `Provider | None`.
+        secondary = self.secondary
+        assert secondary is not None
         result = await with_retries(
-            lambda: self.secondary.charge(  # type: ignore[union-attr]
+            lambda: secondary.charge(
                 amount=amount,
                 currency=currency,
                 payment_method_token=payment_method_token,
@@ -134,7 +137,7 @@ class ProviderRouter:
             max_delay_ms=self.retry_max_delay_ms,
             rng=self._rng,
         )
-        return result, self.secondary.name
+        return result, secondary.name
 
     async def refund(
         self,

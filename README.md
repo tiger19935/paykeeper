@@ -8,8 +8,8 @@ as a reference implementation of patterns I ran in production
 (PHP/Laravel at a US fintech; Python on AWS Lambda), rewritten here as a
 standalone Python 3.12 service on FastAPI + SQLAlchemy 2.0 + PostgreSQL.
 
-The repository is small on purpose. Every file exists for a reason, and
-every documented behaviour has a test that fails if it regresses.
+The repository is deliberately small; every documented behaviour has a
+test that fails if it regresses.
 
 ## Quick start
 
