@@ -1,0 +1,99 @@
+[project]
+name = "paykeeper"
+version = "0.1.0"
+description = "Idempotent charge/refund API with PSP failover and reconciliation."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "MIT" }
+authors = [{ name = "Andrii Boiko", email = "a.boyko.93@gmail.com" }]
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.32,<1.0",
+    "pydantic>=2.9,<3.0",
+    "pydantic-settings>=2.6,<3.0",
+    "sqlalchemy[asyncio]>=2.0.36,<2.1",
+    "asyncpg>=0.30,<1.0",
+    "alembic>=1.13,<2.0",
+    "httpx>=0.27,<1.0",
+    "structlog>=24.4,<25.0",
+    "typer>=0.12,<1.0",
+]
+
+[project.scripts]
+paykeeper = "paykeeper.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9.0",
+    "pytest-asyncio>=0.24,<1.0",
+    "pytest-cov>=5.0,<6.0",
+    "respx>=0.21,<1.0",
+    "testcontainers[postgres]>=4.8,<5.0",
+    "ruff>=0.7,<1.0",
+    "mypy>=1.13,<2.0",
+    "types-psycopg2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/paykeeper"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "S", "ASYNC", "RUF"]
+ignore = [
+    "S101",  # assert used — fine in tests
+    "S104",  # 0.0.0.0 bind — intentional in container
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S311"]
+"migrations/**" = ["N806"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["paykeeper"]
+mypy_path = "src"
+plugins = []
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_any_generics = true
+no_implicit_reexport = true
+
+[[tool.mypy.overrides]]
+module = ["testcontainers.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: integration tests that require Postgres",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/paykeeper"]
+omit = ["src/paykeeper/__main__.py", "src/paykeeper/cli.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
