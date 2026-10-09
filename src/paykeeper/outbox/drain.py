@@ -40,22 +40,24 @@ async def drain_once(
     total = 0
     while True:
         locked = (
-            await session.execute(
-                text(f"SELECT pg_try_advisory_xact_lock({_LOCK_KEY})")
-            )
+            await session.execute(text(f"SELECT pg_try_advisory_xact_lock({_LOCK_KEY})"))
         ).scalar_one()
         if not locked:
             await session.rollback()
             return total
 
         rows = (
-            await session.execute(
-                select(OutboxEvent)
-                .where(OutboxEvent.published_at.is_(None))
-                .order_by(OutboxEvent.created_at, OutboxEvent.id)
-                .limit(batch_size)
+            (
+                await session.execute(
+                    select(OutboxEvent)
+                    .where(OutboxEvent.published_at.is_(None))
+                    .order_by(OutboxEvent.created_at, OutboxEvent.id)
+                    .limit(batch_size)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not rows:
             await session.commit()
             break

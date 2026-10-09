@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from paykeeper.api.errors import install_error_handlers
-from paykeeper.api.routes import charges, health, refunds
+from paykeeper.api.routes import charges, health, refunds, webhooks
 from paykeeper.config import Settings, get_settings
 from paykeeper.db import create_engine, create_sessionmaker
 from paykeeper.logging import bind_request, clear_request, configure_logging, get_logger
@@ -74,4 +74,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(charges.router)
     app.include_router(refunds.router)
+    app.include_router(webhooks.router)
     return app

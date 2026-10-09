@@ -36,9 +36,7 @@ async def test_drain_publishes_then_marks_published(db_session: AsyncSession) ->
         rec = json.loads(line)
         assert rec["event_type"].startswith("test.event_")
 
-    rows = (
-        await db_session.execute(select(OutboxEvent))
-    ).scalars().all()
+    rows = (await db_session.execute(select(OutboxEvent))).scalars().all()
     assert all(r.published_at is not None for r in rows)
 
 

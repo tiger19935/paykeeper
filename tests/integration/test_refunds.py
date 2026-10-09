@@ -50,9 +50,7 @@ _CHARGE_BODY = {
 
 
 async def _create_charge(client: httpx.AsyncClient, key: str = "k-charge-r") -> dict:
-    resp = await client.post(
-        "/v1/charges", json=_CHARGE_BODY, headers={"Idempotency-Key": key}
-    )
+    resp = await client.post("/v1/charges", json=_CHARGE_BODY, headers={"Idempotency-Key": key})
     assert resp.status_code == 201, resp.text
     return resp.json()
 
@@ -74,9 +72,7 @@ async def test_refund_happy_path(client: httpx.AsyncClient) -> None:
 async def test_refund_replay(client: httpx.AsyncClient) -> None:
     charge = await _create_charge(client, key="k-charge-r2")
     body = {"charge_id": charge["id"], "amount": 100}
-    first = await client.post(
-        "/v1/refunds", json=body, headers={"Idempotency-Key": "k-ref-replay"}
-    )
+    first = await client.post("/v1/refunds", json=body, headers={"Idempotency-Key": "k-ref-replay"})
     second = await client.post(
         "/v1/refunds", json=body, headers={"Idempotency-Key": "k-ref-replay"}
     )

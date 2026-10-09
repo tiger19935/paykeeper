@@ -49,9 +49,7 @@ async def test_ambiguous_outcome_recovers_to_single_charge(
     # Age the lock so the next call sees STALE.
     async with sessionmaker_() as session:
         row = (
-            await session.execute(
-                select(IdempotencyKey).where(IdempotencyKey.key == key)
-            )
+            await session.execute(select(IdempotencyKey).where(IdempotencyKey.key == key))
         ).scalar_one()
         row.locked_at = datetime.now(UTC) - timedelta(seconds=120)
         await session.commit()
@@ -71,9 +69,7 @@ async def test_ambiguous_outcome_recovers_to_single_charge(
     assert body["amount"] == 500
 
     async with sessionmaker_() as session:
-        charges = (
-            await session.execute(select(func.count()).select_from(Charge))
-        ).scalar_one()
+        charges = (await session.execute(select(func.count()).select_from(Charge))).scalar_one()
         entries = (
             await session.execute(select(func.count()).select_from(LedgerEntry))
         ).scalar_one()
@@ -123,7 +119,5 @@ async def test_stale_lock_with_no_provider_record_falls_through_to_fresh_charge(
     assert body["status"] == "succeeded"
 
     async with sessionmaker_() as session:
-        charges = (
-            await session.execute(select(func.count()).select_from(Charge))
-        ).scalar_one()
+        charges = (await session.execute(select(func.count()).select_from(Charge))).scalar_one()
     assert charges == 1
