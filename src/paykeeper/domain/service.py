@@ -33,8 +33,10 @@ from paykeeper.domain.enums import (
 from paykeeper.domain.models import Charge, LedgerEntry, OutboxEvent
 from paykeeper.idempotency import claim_or_replay, complete_key, fingerprint
 from paykeeper.idempotency.keys import IdempotencyOutcome, IdempotencyOutcomeKind
+from paykeeper.providers.backoff import with_retries
 from paykeeper.providers.base import (
     CardDeclinedError,
+    ChargeResult,
     InvalidRequestError,
     Provider,
     ProviderError,
@@ -97,6 +99,9 @@ async def process_charge(
     body: dict[str, Any],
     stale_after: timedelta,
     ttl: timedelta,
+    retry_max_attempts: int = 4,
+    retry_base_delay_ms: int = 50,
+    retry_max_delay_ms: int = 2000,
 ) -> tuple[int, dict[str, Any]]:
     scope = f"{IdempotencyScope.CHARGE.value}:{body['customer_id']}"
     fp = fingerprint(body)
@@ -133,13 +138,21 @@ async def process_charge(
 
     assert outcome.kind is IdempotencyOutcomeKind.NEW
 
-    try:
-        charge_result = await provider.charge(
+    async def _call_provider() -> ChargeResult:
+        return await provider.charge(
             amount=body["amount"],
             currency=body["currency"],
             payment_method_token=body["payment_method_token"],
             customer_id=body["customer_id"],
             operation_id=outcome.operation_id,
+        )
+
+    try:
+        charge_result = await with_retries(
+            _call_provider,
+            max_attempts=retry_max_attempts,
+            base_delay_ms=retry_base_delay_ms,
+            max_delay_ms=retry_max_delay_ms,
         )
     except CardDeclinedError as exc:
         charge = Charge(

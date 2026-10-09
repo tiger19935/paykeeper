@@ -29,6 +29,9 @@ async def create_charge(
         body=body.model_dump(),
         stale_after=timedelta(seconds=settings.idempotency_lock_stale_seconds),
         ttl=timedelta(seconds=settings.idempotency_ttl_seconds),
+        retry_max_attempts=settings.retry_max_attempts,
+        retry_base_delay_ms=settings.retry_base_delay_ms,
+        retry_max_delay_ms=settings.retry_max_delay_ms,
     )
     return JSONResponse(status_code=status, content=response)
 
