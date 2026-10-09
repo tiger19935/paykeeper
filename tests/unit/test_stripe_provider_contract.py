@@ -184,6 +184,6 @@ def test_webhook_verify_valid_x_signature_headers(provider: StripeProvider) -> N
 
 
 def test_webhook_verify_rejects_tampered(provider: StripeProvider) -> None:
-    body = b"{\"id\":\"evt_x\",\"type\":\"charge.succeeded\"}"
+    body = b'{"id":"evt_x","type":"charge.succeeded"}'
     with pytest.raises(InvalidRequestError):
         provider.verify_webhook(body=body, signature="deadbeef", timestamp="1")

@@ -104,9 +104,7 @@ async def test_primary_down_opens_breaker_and_secondary_takes_over(
 
     # Confirm persistence: all five rows exist, with correct providers.
     async with sessionmaker_() as session:
-        rows = (
-            await session.execute(select(Charge).order_by(Charge.created_at))
-        ).scalars().all()
+        rows = (await session.execute(select(Charge).order_by(Charge.created_at))).scalars().all()
     assert [r.provider for r in rows] == [
         "fake:secondary",
         "fake:secondary",

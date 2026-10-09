@@ -109,9 +109,7 @@ class StripeProvider:
             operation_id=operation_id,
         )
 
-    async def get_by_operation_id(
-        self, *, operation_id: str
-    ) -> ChargeResult | RefundResult | None:
+    async def get_by_operation_id(self, *, operation_id: str) -> ChargeResult | RefundResult | None:
         """Search Stripe for a prior charge created with this operation_id."""
 
         try:
@@ -141,9 +139,7 @@ class StripeProvider:
             operation_id=operation_id,
         )
 
-    def verify_webhook(
-        self, *, body: bytes, signature: str, timestamp: str | None
-    ) -> WebhookInfo:
+    def verify_webhook(self, *, body: bytes, signature: str, timestamp: str | None) -> WebhookInfo:
         """Verify a Stripe-flavoured signature header.
 
         Stripe's actual header is `Stripe-Signature: t=<ts>,v1=<sig>,...`;
@@ -162,9 +158,7 @@ class StripeProvider:
             raise InvalidRequestError("missing timestamp or signature")
 
         signed = f"{timestamp}.".encode() + body
-        expected = hmac.new(
-            self._webhook_secret.encode(), signed, hashlib.sha256
-        ).hexdigest()
+        expected = hmac.new(self._webhook_secret.encode(), signed, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(expected, signature):
             raise InvalidRequestError("bad signature")
 
@@ -177,9 +171,7 @@ class StripeProvider:
             payload=payload,
         )
 
-    async def _post(
-        self, path: str, *, form: Mapping[str, str], idem_key: str
-    ) -> dict[str, Any]:
+    async def _post(self, path: str, *, form: Mapping[str, str], idem_key: str) -> dict[str, Any]:
         try:
             resp = await self._client.post(
                 path,

@@ -165,3 +165,10 @@ class FakeProvider:
 
     def all_charges(self) -> list[ChargeResult]:
         return list(self._charges.values())
+
+    def remove_charge(self, operation_id: str) -> None:
+        """Test helper: simulate a provider-side missing record."""
+
+        ch = self._charges.pop(operation_id, None)
+        if ch is not None:
+            self._charges_by_ref.pop(ch.provider_ref, None)
